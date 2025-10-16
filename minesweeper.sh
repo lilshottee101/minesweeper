@@ -2,9 +2,21 @@
 
 COLS=$(tput cols)
 LINS=$(tput lines)
+LINES=$((LINS - 2))
 
 
-declare -A matrix
+declare -A colourArray valueMatrix
+declare mineMultiplier
+colourArray=([1]="\e[38;5;21m"
+	     [2]="\e[38;5;34m"
+	     [3]="\e[38;5;196m"
+	     [4]="\e[38;5;19m"
+	     [5]="\e[38;5;88m"
+	     [6]="\e[38;5;30m"
+	     [7]="\e[38;5;16m"
+	     [8]="\e[38;5;235m"
+	     [hidden]="\e[48;5;240m"
+	     [visible]="\e[48;5;250m")
 
 
 bottomText="Use 'WASD' to move around, 'F' to flag a bombs location, 'E' to reveal."
@@ -12,43 +24,41 @@ topText="MINESWEEPER"
 
 bottomTextLength=${#bottomText}
 topTextLength=${#topText}
-checkSet() {
-		# Pass in 3 args, value1, value2 and variable to set.	
-		if [ $1 -gt $2 ]; then
-			$3 = $2
-		else
-			$3 = $1
-		fi
+generateMatrix() {
+	for (( i=1; i<$LINES; i++ )) do
+		for (( y=1; y<$COLS; y++ )) do
+			num=$((RANDOM % 100))
+			if [ $num -le $1 ]; then
+				valueMatrix[$i,$y]="X"
+			else
+				valueMatrix[$i,$y]="O"
+			fi
+		done
+	done
+
+	for (( x=1; x < $LINES; x++ )) do
+		for (( y=1; y < $COLS; y++ )) do
+			mineCount=0
+			if [ "${valueMatrix[$x,$y]}" != "X" ]; then
+				for (( mx=$x - 1; mx <= $x + 1; mx++ )) do
+					for (( my=$y - 1; my <= $y + 1; my++ )) do
+						if [[ "${valueMatrix[$mx,$my]}" == "X" ]]; then
+							((mineCount++))
+						fi
+					done
+				done
+				valueMatrix[$x,$y]="$mineCount"
+			fi
+		done
+	done
 }
-setup() {
-	read -p "Please select difficulty: \n 1) Easy \n 2) Medium \n 3) Hard \n :" difficulty
-	read -p "Please select maze size: \n 1) Beginner \n 2) Intermediate \n 3) Expert \n 4) Terminal Size \n 5) Custom (Max Terminal Size) \n :" boardSize
-	case $boardSize in
-		"1" | "Beginner" | "beginner")
-			boardHeight=9
-			boardWidth=9
-		;;
-		"2" | "Intermediate" | "intermediate")
-			checkSet "30" $COLS $boardWidth
-			checkSet "30" $LINS $boardHeight
-		;;
-		"3" | "Expert" | "expert")
-			boardHeight=30
-			boardHeight=30
-		;;
-	esac
-	if [[ -n $1 || -n $2 ]]; then
-		if [ $1 -gt $COLS ]; then
-			$mazeWidth=$COLS
-		else
-			$mazeWidth=$1
-		fi
-		if [ $1 -gt $LINS ]; then
-			$mazeHeight=$LINS
-		else
-			$mazeHeight=$2
-		fi
-	fi
+printMatrix() {
+	for (( x=1; x < $LINES; x++ )) do
+		for (( y=1; y < $COLS; y++ )) do
+			goto $((x + 1)) $y	
+			printf "${valueMatrix[$x,$y]}"
+		done
+	done
 }
 # Accepts arguments as Line Column Text
 goto() {
@@ -63,10 +73,20 @@ cleanUp() {
 }
 # Main function that sets up loop and then runs function to listen for keybinds
 main() {
-	setup
-	printf "\e[?47h"
-	printf "\e 7"
+	read -p "Please select difficulty: \n 1) Easy \n 2) Medium \n 3) Hard \n :" difficulty
+	case $difficulty in
+		"1" | "Easy" | "easy")
+			generateMatrix 12
+		;;
+		"2" | "Medium" | "medium")
+			generateMatrix 15
+		;;
+		"3" | "Hard" | "hard")
+			generateMatrix 20
+		;;
+	esac
 	clear
+	printMatrix
 	#Prit Instructions to the bottom of the screen
 	goto $LINS $(((COLS / 2) - (bottomTextLength / 2)))
 	printf "$bottomText"
